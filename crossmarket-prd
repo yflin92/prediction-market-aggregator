@@ -1,0 +1,1706 @@
+# Product Requirements Document: CrossMarket
+
+**Product:** CrossMarket  
+**Platform:** macOS desktop app  
+**Status:** Draft v0.1  
+**Owner:** Product  
+**Target:** MVP
+
+---
+
+## 1. Executive Summary
+
+CrossMarket is a native macOS application that aggregates prediction markets from **Kalshi and Polymarket**, matches equivalent markets across the two venues, and presents them through a single normalized interface.
+
+The product answers three core questions for a prediction-market trader:
+
+1. **What markets are available right now?**
+2. **Which venue offers the better price and liquidity?**
+3. **Where do the two markets disagree enough to create a trading opportunity?**
+
+Instead of searching Kalshi and Polymarket independently, users should be able to open CrossMarket and immediately see:
+
+> **Fed cuts rates in September**  
+> Kalshi: YES 63¢  
+> Polymarket: YES 58¢  
+> **Spread: 5¢**
+
+The primary product advantage is not simply putting two APIs into one UI. The core value is building a reliable **canonical market layer** that understands when a Kalshi contract and a Polymarket contract are actually asking the same question.
+
+The MVP will focus on **discovery, comparison, market matching, alerts, and opportunity detection**. Direct trading will be architected for but treated as a subsequent phase.
+
+---
+
+# 2. Background
+
+Prediction markets are increasingly fragmented across venues.
+
+A user researching a single event today may need to:
+
+- Search Kalshi.
+- Search Polymarket.
+- Determine whether two similarly worded contracts actually resolve identically.
+- Compare bid/ask prices.
+- Compare liquidity.
+- Account for spreads and fees.
+- Monitor both markets for price changes.
+- Manually switch between apps to trade.
+
+This creates unnecessary friction and makes cross-market price discrepancies difficult to identify.
+
+Both platforms expose APIs suitable for aggregation.
+
+Kalshi provides public market endpoints and order books as well as authenticated WebSocket streams for real-time order-book, trade, and market updates.
+
+Polymarket US exposes a public API for markets, events, prices and order books, plus authenticated APIs and WebSockets for trading and account data.
+
+For a U.S.-focused product, **Polymarket US must be treated separately from international Polymarket**. Polymarket's international product continues to restrict U.S. order placement, while Polymarket US operates as a separate product and CFTC-regulated DCM.
+
+---
+
+# 3. Problem Statement
+
+### User problem
+
+Prediction-market traders lack a fast way to understand:
+
+> **“For this event, what is the market consensus across venues, and where should I trade?”**
+
+Today, identifying this requires manually reconciling different:
+
+- market names,
+- event hierarchies,
+- resolution criteria,
+- expiration dates,
+- order-book formats,
+- price representations,
+- liquidity measurements,
+- categories,
+- and trading interfaces.
+
+The hardest part is not fetching prices.
+
+It is determining whether:
+
+> Kalshi: **“Will the Fed lower the target rate at its September meeting?”**
+
+and
+
+> Polymarket: **“Fed rate cut by September?”**
+
+represent economically identical contracts.
+
+Incorrect matching could show users nonexistent arbitrage opportunities and is therefore a critical product risk.
+
+---
+
+# 4. Product Vision
+
+### Long-term vision
+
+**The Bloomberg Terminal for prediction markets.**
+
+CrossMarket becomes the venue-agnostic interface through which sophisticated prediction-market users discover, analyze, compare, monitor, and eventually trade event contracts.
+
+Long term, Kalshi and Polymarket should simply appear as liquidity venues underneath a unified prediction-market layer.
+
+Instead of thinking:
+
+> “I want to trade on Kalshi.”
+
+The user thinks:
+
+> “I think this event has a 70% chance of happening. Where can I get the best execution?”
+
+---
+
+# 5. Goals
+
+## MVP goals
+
+CrossMarket should allow users to:
+
+1. Browse active markets from Kalshi and Polymarket in one application.
+2. Search both platforms simultaneously.
+3. Automatically identify equivalent markets.
+4. Compare executable YES/NO prices.
+5. Compare spreads, volume, and liquidity.
+6. Detect meaningful cross-market price differences.
+7. Detect true cross-market arbitrage when possible.
+8. Inspect the underlying resolution criteria before trading.
+9. Watch markets.
+10. Receive native macOS alerts when prices or spreads cross user-defined thresholds.
+11. Deep-link users to the appropriate venue to execute.
+
+---
+
+# 6. Non-Goals for MVP
+
+The first release will **not** attempt to:
+
+- Custody user funds.
+- Become a prediction exchange itself.
+- Create synthetic contracts.
+- Guarantee arbitrage profitability.
+- Automatically execute arbitrage trades.
+- Automatically move money between venues.
+- Provide tax reporting.
+- Provide social feeds or comments.
+- Aggregate every prediction market.
+- Build a mobile application.
+- Build sophisticated AI forecasting models.
+
+Direct trading through Kalshi and Polymarket APIs is explicitly deferred to a later phase.
+
+---
+
+# 7. Target Users
+
+## Persona A — Active prediction-market trader
+
+Trades multiple markets per week.
+
+### Needs
+
+- Faster market discovery.
+- Best venue.
+- Real-time pricing.
+- Liquidity comparison.
+- Arbitrage detection.
+- Alerts.
+
+### Current behavior
+
+Has multiple browser tabs open for Kalshi, Polymarket, X, news and possibly spreadsheets.
+
+---
+
+## Persona B — Event-driven investor
+
+Primarily trades:
+
+- elections,
+- macroeconomic events,
+- Fed decisions,
+- economic data,
+- crypto,
+- technology,
+- geopolitics.
+
+### Needs
+
+An efficient way to see the market-implied probability of an event across multiple venues.
+
+---
+
+## Persona C — Prediction-market power user / market maker
+
+Highly price sensitive.
+
+### Needs
+
+- Order-book depth.
+- Cross-market spreads.
+- Executable prices rather than headline probabilities.
+- Keyboard-driven interface.
+- Rapid market updates.
+
+This persona becomes increasingly important after MVP.
+
+---
+
+# 8. Jobs to Be Done
+
+### Discovery
+
+> When something happens in the world, help me immediately find every market where I can trade it.
+
+### Comparison
+
+> When multiple venues offer the same market, tell me which one gives me the best executable price.
+
+### Divergence
+
+> Tell me when Kalshi and Polymarket materially disagree about the probability of the same outcome.
+
+### Arbitrage
+
+> Tell me when complementary positions across venues can be purchased for less than their guaranteed settlement value.
+
+### Monitoring
+
+> Let me follow an event without repeatedly checking both platforms.
+
+### Trust
+
+> Before I trade a price discrepancy, help me verify that the two contracts actually resolve according to equivalent rules.
+
+---
+
+# 9. Product Principles
+
+### 1. Executable prices > headline probabilities
+
+The app should emphasize:
+
+- best bid,
+- best ask,
+- spread,
+- depth,
+
+rather than simply showing the latest trade.
+
+A displayed 55% probability does not mean the user can necessarily buy at 55¢.
+
+---
+
+### 2. Never imply equivalence when contracts differ
+
+Market matching must be conservative.
+
+It is preferable to miss an opportunity than to falsely claim:
+
+> **ARBITRAGE**
+
+when the contracts have different settlement criteria.
+
+---
+
+### 3. Explain the opportunity
+
+CrossMarket should not simply show:
+
+> +4.7%
+
+It should explain:
+
+> Buy YES on Polymarket at 47¢  
+> Buy NO on Kalshi at 49¢  
+> Gross combined cost: 96¢  
+> Settlement value if markets are equivalent: $1.00  
+> Gross edge: 4¢
+
+---
+
+### 4. Desktop speed
+
+This is a trading workstation, not a content feed.
+
+The application should optimize for:
+
+- information density,
+- keyboard navigation,
+- low latency,
+- persistent windows,
+- native notifications.
+
+---
+
+# 10. Core Experience
+
+The primary application layout will use a three-pane macOS interface.
+
+### Left sidebar
+
+Navigation:
+
+- Home
+- Trending
+- Opportunities
+- Arbitrage
+- Watchlist
+- Politics
+- Economics
+- Crypto
+- Sports
+- Technology
+- Other
+
+---
+
+### Main market table
+
+Example:
+
+| Market | Consensus | Kalshi | Polymarket | Δ | Volume |
+|---|---:|---:|---:|---:|---:|
+| Fed cuts in Sept | 61% | 63¢ | 59¢ | **4¢** | $8.2M |
+| BTC > $150K in 2026 | 37% | 35¢ | 39¢ | **4¢** | $14.1M |
+| Candidate X wins CA | 72% | 72¢ | 71¢ | 1¢ | $3.1M |
+
+The table should support sorting by:
+
+- divergence,
+- volume,
+- liquidity,
+- expiration,
+- probability,
+- recent price change.
+
+---
+
+### Right detail panel
+
+Selecting a market opens:
+
+**Canonical question**
+
+> Will the Federal Reserve cut interest rates at its September meeting?
+
+**Consensus probability**
+
+61%
+
+### Kalshi
+
+YES  
+**62¢ / 63¢**
+
+Volume  
+$1.7M
+
+Liquidity  
+$310K
+
+### Polymarket
+
+YES  
+**58¢ / 59¢**
+
+Volume  
+$6.5M
+
+Liquidity  
+$580K
+
+### Difference
+
+**4¢**
+
+Then:
+
+- price chart,
+- order-book depth,
+- contract rules comparison,
+- source links.
+
+---
+
+# 11. Functional Requirements
+
+## FR1 — Unified Market Feed
+
+The system must ingest active markets from:
+
+- Kalshi
+- Polymarket US
+
+The normalized market object must contain at minimum:
+
+```text
+CanonicalMarket
+
+id
+title
+description
+category
+status
+
+outcomes
+
+open_time
+close_time
+resolution_time
+
+resolution_source
+resolution_rules
+
+venue_markets[]
+```
+
+Each venue market contains:
+
+```text
+VenueMarket
+
+venue
+external_market_id
+external_event_id
+
+title
+description
+rules
+
+yes_bid
+yes_ask
+no_bid
+no_ask
+
+last_price
+
+volume_24h
+total_volume
+liquidity
+
+open_time
+close_time
+
+url
+last_updated_at
+```
+
+---
+
+# 12. Market Normalization
+
+Venue-specific representations must be converted into common concepts.
+
+Internally all binary markets use:
+
+```text
+YES price: 0.00 → 1.00
+NO price: 0.00 → 1.00
+```
+
+For presentation:
+
+```text
+0.63 → 63%
+0.63 → 63¢
+```
+
+The user can select their preferred display format:
+
+- Probability: `63%`
+- Contract price: `63¢`
+
+---
+
+# 13. Market Matching
+
+This is the most important component of the product.
+
+CrossMarket must determine whether two venue contracts represent:
+
+1. **Exact equivalent**
+2. **Likely equivalent**
+3. **Related**
+4. **Unrelated**
+
+Only **Exact equivalent** markets may generate an arbitrage label.
+
+---
+
+## Matching inputs
+
+Matching should consider:
+
+### Entity
+
+Are both markets referring to the same:
+
+- person,
+- team,
+- asset,
+- election,
+- economic indicator,
+- event?
+
+### Predicate
+
+Examples:
+
+- wins
+- exceeds
+- falls below
+- occurs
+- announces
+- resigns
+
+### Threshold
+
+Example:
+
+```text
+BTC > $150,000
+```
+
+is not equivalent to:
+
+```text
+BTC >= $150,000
+```
+
+unless settlement rules make them equivalent.
+
+### Time window
+
+```text
+before Dec 31
+```
+
+versus:
+
+```text
+during 2026
+```
+
+may not be identical.
+
+### Resolution source
+
+Examples:
+
+- Federal Reserve announcement
+- AP election call
+- official government statistics
+- closing price from a named exchange
+
+### Settlement conditions
+
+The application must compare the full resolution language.
+
+---
+
+# 14. Matching Architecture
+
+Initial candidate generation can use:
+
+1. normalized entities,
+2. keywords,
+3. time ranges,
+4. category,
+5. semantic similarity.
+
+An LLM may then classify candidate pairs into:
+
+```text
+EXACT
+LIKELY
+RELATED
+NOT_MATCHED
+```
+
+The model should additionally produce:
+
+```text
+confidence
+reason
+semantic_differences[]
+```
+
+Example:
+
+```text
+Match confidence: 94%
+
+Differences:
+- Kalshi resolves using official FEC certification.
+- Polymarket resolves using AP race call.
+
+Classification:
+LIKELY_EQUIVALENT
+```
+
+This pair could appear in comparison views but would **not** generate a guaranteed-arbitrage badge.
+
+---
+
+# 15. Human Verification Layer
+
+For high-volume markets, CrossMarket should allow internally verified pairings.
+
+Example:
+
+```text
+canonical_market_id = fed-sept-rate-cut
+
+Kalshi:
+KXFED-SEP26-CUT
+
+Polymarket:
+fed-cut-september
+
+status:
+VERIFIED_EXACT
+```
+
+Once verified, the mapping persists.
+
+The app should therefore become more accurate over time rather than repeatedly reclassifying the same recurring contracts.
+
+---
+
+# 16. Price Comparison
+
+For each matched market, CrossMarket calculates:
+
+### Venue divergence
+
+```text
+difference =
+abs(Kalshi midpoint - Polymarket midpoint)
+```
+
+Example:
+
+```text
+Kalshi:     63%
+Polymarket: 58%
+
+Difference: 5 percentage points
+```
+
+This becomes the primary signal in the **Opportunities** feed.
+
+---
+
+# 17. Executable Price Comparison
+
+The app must clearly distinguish:
+
+### Probability difference
+
+from
+
+### Tradable difference
+
+Suppose:
+
+```text
+Kalshi
+Bid: 60
+Ask: 64
+
+Polymarket
+Bid: 57
+Ask: 59
+```
+
+The useful comparison is not:
+
+```text
+62% vs 58%
+```
+
+It is:
+
+> If I want to buy YES right now, where is it cheaper?
+
+Result:
+
+```text
+Polymarket: 59¢
+Kalshi: 64¢
+
+Polymarket cheaper by 5¢.
+```
+
+---
+
+# 18. Arbitrage Detection
+
+CrossMarket should detect situations where equivalent contracts allow guaranteed gross payout.
+
+For example:
+
+```text
+Polymarket YES ask = $0.47
+Kalshi NO ask      = $0.49
+```
+
+Total:
+
+```text
+$0.96
+```
+
+If the contracts resolve identically:
+
+```text
+Guaranteed settlement value = $1.00
+Gross edge                  = $0.04
+Gross return on capital     = 4.17%
+```
+
+The application must then incorporate:
+
+- trading fees,
+- expected slippage,
+- available quantity,
+- minimum order size.
+
+Result:
+
+```text
+Executable arbitrage
+
+Max size: $820
+Gross edge: 4.0%
+Estimated fees: 0.7%
+Net edge: 3.3%
+```
+
+---
+
+# 19. Arbitrage Safety Requirements
+
+An arbitrage opportunity may only receive the **Guaranteed Arbitrage** label when:
+
+```text
+market_match == VERIFIED_EXACT
+AND
+both books are current
+AND
+sufficient executable liquidity exists
+AND
+expected payout > execution cost + fees
+```
+
+Otherwise display:
+
+> **Potential pricing discrepancy**
+
+rather than:
+
+> **Arbitrage**
+
+---
+
+# 20. Opportunity Feed
+
+The **Opportunities** tab ranks markets using:
+
+```text
+Opportunity Score =
+price divergence
+× market-match confidence
+× liquidity score
+× freshness score
+```
+
+The user can filter:
+
+```text
+Minimum divergence:
+> 2%
+> 5%
+> 10%
+
+Minimum liquidity:
+$1K
+$10K
+$100K
+
+Category:
+Politics
+Economics
+Crypto
+Sports
+Technology
+```
+
+---
+
+# 21. Arbitrage Feed
+
+Separate from Opportunities.
+
+Example:
+
+### Fed September Rate Cut
+
+**Estimated edge: +2.8%**
+
+Buy:
+
+**Polymarket YES @ 47¢**
+
+and
+
+**Kalshi NO @ 50¢**
+
+Combined:
+
+**97¢**
+
+Maximum currently executable:
+
+**$1,420**
+
+Resolution match:
+
+**Verified Exact**
+
+---
+
+# 22. Global Search
+
+Keyboard shortcut:
+
+**⌘K**
+
+Search should query the canonical market index rather than requiring the user to select a platform.
+
+Search:
+
+> Trump
+
+Results:
+
+```text
+2028 Presidential Election
+Trump approval > 50%
+Trump announces...
+Republican nominee...
+```
+
+Opening the result reveals all available venues.
+
+---
+
+# 23. Watchlist
+
+Users can watch:
+
+### Individual markets
+
+or:
+
+### Entire events
+
+Example:
+
+> 2028 Presidential Election
+
+The watchlist should persist locally and eventually synchronize across devices if additional clients are launched.
+
+---
+
+# 24. Alerts
+
+Native macOS notifications.
+
+Users may configure:
+
+### Probability alert
+
+> Notify me when YES > 70%.
+
+### Divergence alert
+
+> Notify me when Kalshi vs Polymarket differs by >5%.
+
+### Arbitrage alert
+
+> Notify me when net arbitrage >2%.
+
+### Price movement alert
+
+> Notify me when probability moves more than 10 percentage points within one hour.
+
+### Volume alert
+
+> Notify me when 1-hour volume exceeds $1M.
+
+---
+
+# 25. Market Detail Page
+
+Every market page should contain:
+
+## Header
+
+- Question
+- Probability
+- 24h movement
+- expiration
+- category
+
+## Venue comparison
+
+Kalshi vs Polymarket.
+
+## Order books
+
+Depth visualization.
+
+## Price history
+
+Overlay:
+
+```text
+Kalshi
+Polymarket
+```
+
+on the same chart.
+
+## Volume
+
+Venue-by-venue.
+
+## Resolution rules
+
+Side-by-side diff.
+
+## Matching assessment
+
+Example:
+
+> **98% match — Verified Exact**
+
+or:
+
+> **83% match — Similar contracts with different resolution sources**
+
+---
+
+# 26. Resolution Rule Diff
+
+This should become a differentiating feature.
+
+Example:
+
+### Kalshi
+
+> Resolves YES if the Bureau of Labor Statistics reports CPI above 3.0% for October.
+
+### Polymarket
+
+> Resolves YES if October CPI is greater than or equal to 3.0%.
+
+CrossMarket highlights:
+
+```text
+Kalshi:
+> 3.0%
+
+Polymarket:
+>= 3.0%
+```
+
+Then warns:
+
+> **Contracts are not identical. Arbitrage classification disabled.**
+
+---
+
+# 27. Data Freshness
+
+Every price shown must have an associated timestamp.
+
+Normal:
+
+```text
+Updated <1s ago
+```
+
+Degraded:
+
+```text
+Kalshi data delayed 16s
+```
+
+Stale:
+
+```text
+⚠ Data stale
+```
+
+Stale data must never generate an arbitrage notification.
+
+---
+
+# 28. Real-Time Data
+
+The architecture should prioritize streaming updates for markets currently:
+
+- visible,
+- watched,
+- or being evaluated for arbitrage.
+
+Kalshi supports WebSocket streams for order-book and trade updates.
+
+Polymarket also exposes real-time market WebSockets; its international CLOB market channel streams order-book and price updates, while Polymarket US provides its own market WebSocket infrastructure.
+
+Less important markets may update using REST polling.
+
+---
+
+# 29. macOS Requirements
+
+The application should feel native to macOS.
+
+### Required
+
+- Apple Silicon support.
+- macOS 14+.
+- Native notifications.
+- Menu bar integration.
+- Keyboard navigation.
+- Dark/light mode.
+- Window state persistence.
+- Multiple windows.
+- Secure credential storage through Keychain.
+
+### Key shortcuts
+
+```text
+⌘K     Search
+⌘1     Home
+⌘2     Opportunities
+⌘3     Arbitrage
+⌘4     Watchlist
+
+↑ ↓    Navigate markets
+Enter  Open market
+W      Watch/unwatch
+```
+
+---
+
+# 30. Menu Bar Mode
+
+P1 feature.
+
+CrossMarket can optionally run in the macOS menu bar.
+
+Clicking the icon displays:
+
+```text
+TOP MOVERS
+
+Fed Sept Cut       61%  +8
+BTC > $150K        37%  -6
+Candidate X wins   72%  +4
+
+ARBITRAGE
+
+Fed Sept Cut       +2.7%
+```
+
+This allows users to keep CrossMarket running throughout the day without occupying screen space.
+
+---
+
+# 31. Direct Trading — Phase 2
+
+Once the aggregation experience proves useful, users should be able to connect their venue accounts.
+
+Kalshi provides authenticated trading and portfolio APIs. Polymarket US similarly provides an authenticated retail API for orders, positions, balances and real-time account updates.
+
+Credentials should remain encrypted in macOS Keychain and never be logged.
+
+The application then enables:
+
+```text
+BUY YES
+
+Venue
+
+○ Kalshi       63¢
+● Polymarket   59¢
+
+Quantity
+$500
+
+Estimated contracts
+847
+
+Estimated cost
+$499.73
+
+[ Review Order ]
+```
+
+---
+
+# 32. Smart Venue Selection — Phase 2
+
+Instead of forcing users to think about venues:
+
+> **Buy $1,000 YES at best available price**
+
+CrossMarket can calculate execution:
+
+```text
+Polymarket
+500 contracts @ 0.58
+
+Kalshi
+300 contracts @ 0.59
+
+Polymarket
+900 contracts @ 0.60
+```
+
+and route across venues.
+
+This evolves CrossMarket from an aggregator into a **prediction-market execution layer**.
+
+---
+
+# 33. Two-Leg Arbitrage Execution — Phase 3
+
+For verified-equivalent markets:
+
+```text
+ARBITRAGE AVAILABLE
+
+Buy YES
+Polymarket
+47¢
+
+Buy NO
+Kalshi
+49¢
+
+Combined
+96¢
+
+Estimated net edge
+3.2%
+
+Maximum size
+$2,840
+```
+
+User presses:
+
+> **Execute Both**
+
+The system submits both orders.
+
+However, execution introduces **legging risk**:
+
+1. first order executes,
+2. market moves,
+3. second order fails.
+
+CrossMarket must therefore explicitly manage:
+
+- order sequencing,
+- fill-or-kill orders when supported,
+- maximum permitted slippage,
+- partial fills,
+- cancellation,
+- hedge fallback behavior.
+
+This feature should not ship until these failure modes are thoroughly designed.
+
+---
+
+# 34. Security
+
+### API credentials
+
+Store only in:
+
+**macOS Keychain**
+
+Never:
+
+- plaintext files,
+- analytics,
+- logs,
+- cloud synchronization.
+
+### Sensitive operations
+
+Require explicit confirmation before:
+
+- placing an order,
+- cancelling an order,
+- submitting both legs of an arbitrage.
+
+---
+
+# 35. Regulatory / Platform Constraints
+
+The product must distinguish between:
+
+- Kalshi,
+- Polymarket US,
+- international Polymarket.
+
+The international Polymarket API currently blocks order placement from U.S. locations, while Polymarket US operates separately and exposes its own APIs.
+
+Therefore the product must **never route users around platform geographic restrictions**.
+
+Country/region availability should be determined before enabling trading.
+
+Aggregation of public market information can remain distinct from execution eligibility.
+
+Before shipping direct execution, legal review should cover:
+
+- exchange API terms,
+- market-data redistribution rights,
+- introducing-broker / intermediary implications,
+- trading authorization,
+- fee disclosure,
+- required risk disclosures,
+- App Store implications if distributed there.
+
+---
+
+# 36. Analytics
+
+Track product behavior rather than trading secrets.
+
+### Product analytics
+
+- Daily active users.
+- Markets viewed.
+- Searches/user.
+- Watchlist adds.
+- Alerts created.
+- Alert click-through.
+- Opportunity views.
+- Venue deep-link clicks.
+- Time from notification → market view.
+
+### Matching analytics
+
+- Number of source markets.
+- Percentage with canonical matches.
+- Exact-match rate.
+- Likely-match rate.
+- User-reported mismatches.
+- False-match rate.
+
+---
+
+# 37. North Star Metric
+
+## Weekly Active Market Decisions
+
+A **Market Decision** occurs when a user:
+
+- compares venues,
+- creates an alert,
+- adds a market to watchlist,
+- or proceeds to trade from a market page.
+
+This measures actual decision-making value rather than raw app usage.
+
+---
+
+# 38. Secondary Success Metrics
+
+### MVP
+
+Within 90 days:
+
+- >40% week-4 retention among users who create a watchlist.
+- >5 markets viewed per active session.
+- >30% of active users configure at least one alert.
+- >20% of sessions involve a cross-venue matched market.
+- >95% precision for `VERIFIED_EXACT` contract mappings.
+- <2 seconds application cold-start-to-market-feed.
+- <1 second median visible-market price lag during normal operation.
+
+The most important quality metric is:
+
+> **False arbitrage alerts ≈ zero.**
+
+---
+
+# 39. MVP Scope
+
+## P0 — Required
+
+### Data
+
+- Kalshi market ingestion.
+- Polymarket US market ingestion.
+- Normalized market schema.
+- Price/order-book ingestion.
+- Market matching.
+
+### UI
+
+- Market feed.
+- Search.
+- Categories.
+- Market detail.
+- Kalshi vs Polymarket comparison.
+- Order-book comparison.
+- Resolution criteria.
+- Watchlist.
+
+### Intelligence
+
+- Price divergence.
+- Match confidence.
+- Arbitrage detection.
+- Contract-rule warnings.
+
+### Desktop
+
+- Native macOS app.
+- Notifications.
+- Keyboard shortcuts.
+- Keychain-ready credential architecture.
+
+---
+
+## P1
+
+- Price history.
+- Menu bar mode.
+- Advanced filtering.
+- Saved searches.
+- Custom alerts.
+- Portfolio aggregation.
+- Kalshi account connection.
+- Polymarket US account connection.
+
+---
+
+## P2
+
+- Direct trading.
+- Smart order routing.
+- Multi-venue portfolio.
+- P&L aggregation.
+- Two-leg arbitrage execution.
+- Historical opportunity analysis.
+- Additional prediction venues.
+
+---
+
+# 40. MVP User Journey
+
+### Step 1
+
+User opens CrossMarket.
+
+Immediately sees:
+
+```text
+TRENDING
+
+Fed cuts in September         61%
+BTC above $150K               38%
+2028 Presidential Election    ...
+```
+
+---
+
+### Step 2
+
+A badge catches attention:
+
+> **6¢ venue divergence**
+
+User opens the market.
+
+---
+
+### Step 3
+
+CrossMarket displays:
+
+```text
+                   KALSHI     POLYMARKET
+
+YES bid              61¢           56¢
+YES ask              63¢           57¢
+
+Volume              $2.1M         $7.8M
+```
+
+---
+
+### Step 4
+
+CrossMarket explains:
+
+> Polymarket YES can currently be purchased 6¢ cheaper than Kalshi YES.
+
+---
+
+### Step 5
+
+User checks:
+
+**Resolution Match: 97%**
+
+The app shows the rules side by side.
+
+---
+
+### Step 6
+
+User clicks:
+
+> **Open Polymarket**
+
+and executes the trade there.
+
+This workflow alone provides meaningful MVP value without CrossMarket ever touching user funds.
+
+---
+
+# 41. Architecture Concept
+
+The logical system is:
+
+```text
+                 ┌───────────────┐
+                 │    Kalshi     │
+                 └───────┬───────┘
+                         │
+                   REST / WebSocket
+                         │
+
+┌──────────────┐   ┌─────▼────────────┐
+│ Polymarket   ├──►│ Venue Adapters   │
+└──────────────┘   └─────┬────────────┘
+                         │
+                  normalized markets
+                         │
+                ┌────────▼─────────┐
+                │ Canonical Market │
+                │      Engine      │
+                └────────┬─────────┘
+                         │
+          ┌──────────────┼───────────────┐
+          │              │               │
+          ▼              ▼               ▼
+      Matching        Pricing        Arbitrage
+       Engine          Engine          Engine
+          │              │               │
+          └──────────────┼───────────────┘
+                         ▼
+                  Local Data Store
+                         │
+                         ▼
+                  macOS Application
+```
+
+The venue-adapter abstraction is strategically important.
+
+Adding a future platform should require implementing:
+
+```text
+PredictionMarketVenue
+```
+
+rather than rewriting the application.
+
+---
+
+# 42. Proposed Venue Interface
+
+Conceptually:
+
+```text
+interface PredictionMarketVenue {
+    listMarkets()
+    getMarket()
+    getOrderBook()
+    subscribePrices()
+    subscribeOrderBook()
+
+    // Phase 2
+    getBalances()
+    getPositions()
+    placeOrder()
+    cancelOrder()
+}
+```
+
+This makes:
+
+```text
+Kalshi
+Polymarket
+FutureVenue
+```
+
+implementation details beneath the canonical product layer.
+
+---
+
+# 43. Biggest Product Risks
+
+## Risk 1 — Incorrect market matching
+
+**Impact:** Critical.
+
+A false match could create a fake arbitrage signal.
+
+### Mitigation
+
+- Conservative thresholds.
+- resolution-rule comparison.
+- manual verification.
+- never call low-confidence discrepancies arbitrage.
+
+---
+
+## Risk 2 — Data latency
+
+A 3% arbitrage visible in stale data may have disappeared.
+
+### Mitigation
+
+- WebSockets.
+- timestamps everywhere.
+- stale-data detection.
+- execution-price calculation based on order-book depth.
+
+---
+
+## Risk 3 — Liquidity illusion
+
+Best ask:
+
+```text
+47¢
+```
+
+may only contain:
+
+```text
+$3
+```
+
+of liquidity.
+
+### Mitigation
+
+Opportunities must display **size-adjusted executable edge**.
+
+---
+
+## Risk 4 — Contract semantic differences
+
+Different:
+
+- expiration,
+- resolution source,
+- thresholds,
+- cancellation rules,
+
+can destroy supposed arbitrage.
+
+### Mitigation
+
+Make resolution comparison a first-class product feature.
+
+---
+
+## Risk 5 — Platform/API changes
+
+Venue APIs may evolve.
+
+### Mitigation
+
+Use a strict adapter layer and normalized domain model.
+
+---
+
+# 44. Key Product Bet
+
+The bet behind CrossMarket is:
+
+> **Prediction-market liquidity will remain fragmented, while users increasingly care about the underlying event rather than which exchange lists it.**
+
+If that is true, the strategically valuable layer is not another prediction exchange.
+
+It is the abstraction above the exchanges:
+
+```text
+Event
+      ↓
+Canonical Market
+      ↓
+Available Liquidity
+      ↓
+Best Execution
+      ↓
+Kalshi / Polymarket / Future Venues
+```
+
+The MVP should therefore optimize for owning the **canonical market graph**.
+
+That dataset—knowing which contracts across venues represent the same economic proposition—can eventually become more defensible than the desktop UI itself.
+
+---
+
+# 45. Recommended Build Sequence
+
+### Milestone 1 — Unified data
+
+Build:
+
+- Kalshi adapter.
+- Polymarket adapter.
+- normalized schema.
+- unified market list.
+
+Success condition:
+
+> Search once and see results from both platforms.
+
+### Milestone 2 — Canonical markets
+
+Build:
+
+- candidate generation.
+- semantic matching.
+- rule comparison.
+- persisted mappings.
+
+Success condition:
+
+> The same real-world question appears once, with multiple venues underneath it.
+
+### Milestone 3 — Trader workstation
+
+Build:
+
+- macOS interface.
+- market table.
+- detail pane.
+- order books.
+- keyboard navigation.
+
+Success condition:
+
+> CrossMarket is materially faster than keeping Kalshi and Polymarket open side by side.
+
+### Milestone 4 — Opportunity engine
+
+Build:
+
+- divergence calculations.
+- liquidity-adjusted prices.
+- arbitrage engine.
+- alerts.
+
+Success condition:
+
+> CrossMarket proactively identifies a useful trade the user would otherwise have missed.
+
+### Milestone 5 — Execution
+
+After product-market validation:
+
+- connect accounts.
+- portfolio aggregation.
+- direct orders.
+- smart routing.
+
+---
+
+# 46. MVP Definition of Done
+
+The MVP is ready for external beta when a user can open the Mac app, search for a real-world prediction, see equivalent contracts from Kalshi and Polymarket combined into a single canonical market, compare current executable prices and liquidity, understand material differences between resolution rules, watch that market, receive an alert when the venues diverge, and navigate directly to the appropriate exchange to trade.
+
+The defining experience should feel like:
+
+> **“I no longer need to check Kalshi and Polymarket separately.”**
