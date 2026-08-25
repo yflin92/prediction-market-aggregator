@@ -85,6 +85,31 @@ test('stale data never yields a guaranteed label (PRD §27)', () => {
   assert.equal(arb!.guaranteed, false);
 });
 
+test('no liquidity on one venue: gross edge exists but not guaranteed', () => {
+  // Kalshi has a book with size; polymarket has zero depth (no orderBook and
+  // liquidity 0). The gross pricing edge still exists, but executable size is
+  // bounded by the thinner (empty) leg, so it falls below MIN_SIZE_USD and the
+  // opportunity cannot be labeled guaranteed (PRD §18, Risk 3).
+  const k = vm('kalshi', {
+    yesAsk: 0.4,
+    noAsk: 0.4,
+    liquidity: 100_000,
+    orderBook: { asks: [{ price: 0.4, size: 1000 }], bids: [] },
+  });
+  const p = vm('polymarket', {
+    yesAsk: 0.47,
+    noAsk: 0.47,
+    liquidity: 0,
+    orderBook: { asks: [], bids: [] },
+  });
+  const arb = detectArbitrage(market('VERIFIED_EXACT', k, p), fresh);
+  assert.ok(arb, 'a gross pricing edge should still be surfaced');
+  assert.ok(arb!.grossEdge > 0, 'combined cost is under $1');
+  assert.equal(arb!.maxSize, 0, 'thinner leg has no executable size');
+  assert.equal(arb!.guaranteed, false, 'zero size cannot be guaranteed');
+  assert.equal(arb!.label, 'Potential pricing discrepancy');
+});
+
 test('single-venue market has no arbitrage', () => {
   const k = vm('kalshi', { yesAsk: 0.5, noAsk: 0.4 });
   const m: CanonicalMarket = { ...market('SINGLE_VENUE', k, k), venueMarkets: [k] };
